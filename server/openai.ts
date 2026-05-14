@@ -1,6 +1,9 @@
 import OpenAI from 'openai';
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const client = new OpenAI({
+    apiKey: process.env.GEMINI_API_KEY, // 1. Use your new environment variable
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/" // 2. Point to Gemini's endpoint
+});
 
 const parseResponse = (text: string) => {
   try {
@@ -28,7 +31,7 @@ Request: "${project}"
 Keep the JSON valid and ensure no extra fields are added.`;
 
   const completion = await client.chat.completions.create({
-    model: 'gpt-4.1-mini',
+    model: 'gemini-2.5-flash',
     messages: [
       { role: 'system', content: 'You create structured project plans from a high-level task description.' },
       { role: 'user', content: prompt },

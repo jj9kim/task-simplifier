@@ -9,7 +9,8 @@
     "build": "npx vite build",
     "preview": "vite preview",
     "server": "node --loader ts-node/esm server/index.ts",
-    "start": "concurrently \"npm run server\" \"npm run dev\""
+    "start": "npm run prestart && npm run server",
+    "prestart": "npx kill-port 4000 || true"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -27,6 +28,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.4.0",
     "concurrently": "^8.2.2",
+    "kill-port": "^2.0.1",
     "nodemon": "^3.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

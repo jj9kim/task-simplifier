@@ -5,6 +5,9 @@ import { generateProjectPlan } from './openai.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server listening on port ${port}`);
+});
 
 // Enable CORS for your Vercel frontend
 app.use(cors({

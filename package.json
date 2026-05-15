@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npx vite build",
     "preview": "vite preview",
     "server": "nodemon --watch server --ext ts --exec \"node --loader ts-node/esm\" server/index.ts",
     "start": "concurrently \"npm run server\" \"npm run dev\""
@@ -15,6 +15,7 @@
     "cors": "^2.8.6",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "lz-string": "^1.5.0",
     "openai": "^4.10.0"
   },
   "devDependencies": {

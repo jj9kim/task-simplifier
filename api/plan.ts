@@ -29,61 +29,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 async function generateProjectPlan(project: string) {
-  const prompt = `You are an expert project planner. Analyze this project and return a VALID JSON object.
+  // Make the prompt more concise to save tokens
+  const prompt = `Project: "${project}"
 
-Project: "${project}"
+Return a JSON object with these exact keys (use real data for this project):
+- subtasks (array of 10-15 strings)
+- milestones (array of 5-8 strings)
+- priorities (array matching subtasks: "High"/"Medium"/"Low")
+- effortEstimates (array matching subtasks: "Small"/"Medium"/"Large"/"XL")
+- dependencies (array of strings)
+- suggestedOrder (array of subtask names in order)
+- raw (string summary)
+- developerTasks (array of strings)
+- qaTasks (array of strings)
+- documentationTasks (array of strings)
+- timeline: { phases: [{name, startDate, endDate, tasks, assignedRoles}], totalEstimatedWeeks: number }
+- teamStructure: { roles, estimatedTeamSize, collaborationTools, meetingCadence }
+- trackingMetrics (array of strings)
+- jiraFormat: { epicName, issues: [{summary, type, priority, assignee}] }
 
-Return EXACTLY this structure (replace with real data, but keep the exact keys):
-
-{
-  "subtasks": ["Task 1", "Task 2"],
-  "milestones": ["Milestone 1", "Milestone 2"],
-  "priorities": ["High", "Medium"],
-  "effortEstimates": ["Medium", "Large"],
-  "dependencies": ["Task 2 depends on Task 1"],
-  "suggestedOrder": ["Task 1", "Task 2"],
-  "raw": "Brief summary of the plan",
-  "developerTasks": ["Dev task 1"],
-  "qaTasks": ["QA task 1"],
-  "documentationTasks": ["Doc task 1"],
-  "timeline": {
-    "phases": [{"name": "Phase 1", "startDate": "Week 1", "endDate": "Week 2", "tasks": ["Task 1"], "assignedRoles": ["Dev"]}],
-    "totalEstimatedWeeks": 4
-  },
-  "teamStructure": {
-    "roles": ["Developer", "QA"],
-    "estimatedTeamSize": 3,
-    "collaborationTools": ["Jira", "Slack"],
-    "meetingCadence": "Daily standup"
-  },
-  "trackingMetrics": ["Completion rate", "Bug count"],
-  "jiraFormat": {
-    "epicName": "Project Epic",
-    "issues": [{"summary": "Task summary", "type": "Task", "priority": "High", "assignee": "Dev"}]
-  }
-}
-
-CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no extra text at the end. Make sure all strings are properly closed with double quotes.`;
+Return ONLY valid JSON.`;
 
   const completion = await client.chat.completions.create({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-1.5-flash',  // More stable model
     messages: [
-      { role: 'system', content: 'You are a JSON generator. You always return complete, valid JSON with no trailing commas, no comments, and all strings properly closed. Never cut off mid-response.' },
+      { role: 'system', content: 'You return complete, valid JSON only. Always finish your response.' },
       { role: 'user', content: prompt },
     ],
-    temperature: 0.5,  // Lower temperature for more predictable output
-    max_tokens: 3000,  // Reduced from 4000 to avoid cutoff
+    temperature: 0.5,
+    max_tokens: 4096,  // Maximum allowed
   });
 
   let text = completion.choices?.[0]?.message?.content || '';
   
   // Clean markdown
-  text = text.replace(/```json\n?/g, '');
-  text = text.replace(/```\n?/g, '');
-  text = text.trim();
+  text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   
-  // Try multiple parsing strategies
+  // Check if response was cut off
+  if (!text.endsWith('}') && !text.endsWith(']')) {
+    console.log('Response appears cut off, attempting to complete...');
+    // Try to complete with another API call
+    text = await completeCutoffJSON(text, project);
+  }
+  
   return parseJSONSafely(text);
+}
+
+async function completeCutoffJSON(incompleteJSON: string, project: string): Promise<string> {
+  const completion = await client.chat.completions.create({
+    model: 'gemini-1.5-flash',
+    messages: [
+      { role: 'system', content: 'Continue the JSON from where it left off. Do not add any explanation, just complete the JSON properly.' },
+      { role: 'user', content: `Complete this JSON response. Start exactly where it left off:\n\n${incompleteJSON}` },
+    ],
+    temperature: 0.3,
+    max_tokens: 2000,
+  });
+  
+  const continuation = completion.choices?.[0]?.message?.content || '';
+  return incompleteJSON + continuation;
 }
 
 function parseJSONSafely(raw: string) {
@@ -94,20 +98,31 @@ function parseJSONSafely(raw: string) {
     console.log('Direct parse failed, trying fixes...');
   }
   
-  // Strategy 2: Try to find JSON object boundaries
+  // Strategy 2: Find complete JSON object
   try {
-    const firstBrace = raw.indexOf('{');
-    const lastBrace = raw.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      const jsonCandidate = raw.substring(firstBrace, lastBrace + 1);
-      return JSON.parse(jsonCandidate);
+    let braceCount = 0;
+    let endIndex = -1;
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i] === '{') braceCount++;
+      if (raw[i] === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          endIndex = i;
+          break;
+        }
+      }
+    }
+    
+    if (endIndex !== -1) {
+      const completeJSON = raw.substring(0, endIndex + 1);
+      return JSON.parse(completeJSON);
     }
   } catch (e) {
     console.log('Boundary extraction failed');
   }
   
-  // Strategy 3: Return empty structure with error message
-  console.error('Could not parse JSON. Raw response:', raw.substring(0, 500));
+  // Strategy 3: Return empty structure with error
+  console.error('Could not parse JSON. Raw:', raw.substring(0, 300));
   return {
     subtasks: [],
     milestones: [],
@@ -115,7 +130,7 @@ function parseJSONSafely(raw: string) {
     effortEstimates: [],
     dependencies: [],
     suggestedOrder: [],
-    raw: `Error parsing AI response: ${raw.substring(0, 200)}...`,
+    raw: `Parse error. Raw response: ${raw.substring(0, 200)}...`,
     developerTasks: [],
     qaTasks: [],
     documentationTasks: [],

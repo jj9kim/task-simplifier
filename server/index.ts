@@ -1,25 +1,16 @@
 import 'dotenv/config';
 import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { generateProjectPlan } from './openai.ts';
 import cors from 'cors';
+import { generateProjectPlan } from './openai.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
 
-app.use(cors());
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-app.use(express.static(path.join(__dirname, '../dist')));
-
-// For any non-API request, serve index.html
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist/index.html'));
-});
-
+// Enable CORS for your Vercel frontend
+app.use(cors({
+  origin: ['https://task-simplifier.vercel.app', 'http://localhost:5173', 'http://localhost:5174'],
+  credentials: true
+}));
 
 app.use(express.json());
 
@@ -36,6 +27,11 @@ app.post('/api/plan', async (req, res) => {
     console.error('plan generation error', error);
     res.status(500).json({ error: 'Unable to generate project plan. Check server logs.' });
   }
+});
+
+// Health check endpoint (optional)
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
 });
 
 app.listen(port, () => {

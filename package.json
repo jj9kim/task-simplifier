@@ -3,11 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "server/index.ts",
   "scripts": {
     "dev": "vite",
     "build": "npx vite build",
     "preview": "vite preview",
-    "server": "nodemon --watch server --ext ts --exec \"node --loader ts-node/esm\" server/index.ts",
+    "server": "node --loader ts-node/esm server/index.ts",
     "start": "concurrently \"npm run server\" \"npm run dev\""
   },
   "dependencies": {

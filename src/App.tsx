@@ -121,13 +121,21 @@ function App() {
         }
     }, []);
 
+    const getApiUrl = () => {
+        // For both dev and production, use relative path
+        return '/api/plan';
+    };
+
+
+    
+
     const handleAutoGenerate = async (project: string) => {
         setLoading(true);
         try {
-            const response = await fetch('https://task-simplifier.onrender.com/api/plan', {
+            const response = await fetch(getApiUrl(), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ project }),
+                body: JSON.stringify({ project: projectText }),
             });
             const data = await response.json();
             setResult(data);
@@ -150,7 +158,7 @@ function App() {
         setActiveTab('summary');
 
         try {
-            const response = await fetch('/api/plan', {
+            const response = await fetch(getApiUrl(), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ project: projectText }),
